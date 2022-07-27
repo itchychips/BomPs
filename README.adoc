@@ -1,0 +1,191 @@
+= BomPs
+
+== Introduction
+
+This module helps calculate input quantities for output items.
+
+This can be used with various games with crafting systems, such as https://www.eveonline.com/[EVE Online], https://www.minecraft.net/en-us[Minecraft], https://www.factorio.com/[Factorio], https://store.steampowered.com/app/1366540/Dyson_Sphere_Program/[Dyson Sphere Program], https://www.satisfactorygame.com/[Satisfactory], among many other games.
+
+You will need to add each recipe yourself, but once that is done, you are able to calculate the bill of materials for an output.
+
+== Dependencies
+
+Depends on https://github.com/RamblingCookieMonster/PSSQLite[PSSQlite].
+
+== License
+
+This project is licensed under AGPL-3.0-or-later.
+
+Any inquiries for sublicensing, a change in licensing (for a reasonable cost of labor), or questions on how to comply with the AGPL in context of this module may be sent to itchychips@itchyeyes.net.
+
+== Examples
+
+First, import the module for BomPs:
+
+[source,powershell]
+----
+Import-Module "...\BomPs.psd1"
+----
+
+All cmdlets that use the database in the module will implicitly open a new connection, but the tables still need to be created.  You'll need to create the schema next by doing:
+
+[source,powershell]
+----
+Register-BomRecipeSchema
+----
+
+NOTE: You may change the default database to use by either manually running `Open-BomRecipeConnection` with a given -DataSource parameter prior to any database command, or setting the `$global:BomPsDefaultDataSource` variable before you open the database.  If you ran the Register cmdlet above, close the database with `Close-BomRecipeConnection` to change the database.
+
+With that, you should be ready to go.
+
+=== Modded Minecraft
+
+Add a collection of recipes for an ambiguously modded Minecraft game:
+
+[source,powershell]
+----
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Wood plank' -OutputQuantity 4 -InputItem 'Log' -InputQuantity 1
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Stick' -OutputQuantity 4 -InputItem 'Wood plank' -InputQuantity 2
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Ladder' -OutputQuantity 3 -InputItem 'Stick' -InputQuantity 6
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Ladder' -OutputQuantity 3 -InputItem 'Wood plank' -InputQuantity 1
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Stone pickaxe' -OutputQuantity 1 -InputItem 'Stick' -InputQuantity 2
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Stone pickaxe' -OutputQuantity 1 -InputItem 'Cobblestone' -InputQuantity 3
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Iron ingot' -OutputQuantity 1 -InputItem 'Iron ore' -InputQuantity 1
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Iron ingot' -OutputQuantity 1 -InputItem 'Coal' -InputQuantity 0.125
+Add-BomRecipe -RecipeVariant 2 -OutputItem 'Iron ingot' -OutputQuantity 1 -InputItem 'Iron dust' -InputQuantity 1
+Add-BomRecipe -RecipeVariant 2 -OutputItem 'Iron ingot' -OutputQuantity 1 -InputItem 'Dusty coal' -InputQuantity 0.125
+Add-BomRecipe -RecipeVariant 3 -OutputItem 'Iron ingot' -OutputQuantity 0.5 -InputItem 'Iron dust' -InputQuantity 1
+Add-BomRecipe -RecipeVariant 3 -OutputItem 'Iron ingot' -OutputQuantity 1 -InputItem 'Coal' -InputQuantity 0.125
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Dusty coal' -OutputQuantity 8 -InputItem 'Coal' -InputQuantity 0.5
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Iron dust' -OutputQuantity 2 -InputItem 'Iron ore' -InputQuantity 1
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Iron track' -OutputQuantity 8 -InputItem 'Iron ingot' -InputQuantity 6
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Iron track' -OutputQuantity 8 -InputItem 'Stick' -InputQuantity 1
+----
+
+After executing the above, we can query how many of each material it will take to repeat the Iron track recipe 8346 times:
+
+[source,powershell]
+----
+PS C:\projects\BomPs> Get-BomMaterial -RecipeVariant 1 -OutputItem 'Iron track' -Quantity 8346 | Format-Table
+Recipe for Iron ingot has the following possible inputs:
+        1 (produces 1):
+                Iron ore x1
+                Coal x0.125
+        2 (produces 1):
+                Iron dust x1
+                Dusty coal x0.125
+        3 (produces 0.5):
+                Iron dust x1
+                Coal x0.125
+Please select which variant: 3
+
+recipe_variant output_item output_quantity input_item input_quantity
+-------------- ----------- --------------- ---------- --------------
+             1 Iron track            66768 Iron ingot          50076
+             1 Iron track            66768 Stick                8346
+             1 Iron dust            100152 Iron ore            50076
+             3 Iron ingot            50076 Iron dust          100152
+             3 Iron ingot            50076 Coal               6259.5
+             1 Stick                  8346 Wood plank           4173
+             1 Wood plank             4173 Log               1043.25
+----
+
+Notice how it asks for user input based on the possible variants of the Iron ingot recipe.  Depending on the game, the results may need interpreting, as normally one cannot use a quarter of a log, though half a coal (with one half wasted) does make sense in context.
+
+You can also give the variants as part of the initial cmdlet invocation:
+
+[source,powershell]
+----
+PS C:\projects\BomPs> Get-BomMaterial -RecipeVariant 1 -OutputItem 'Iron track' -Quantity 64 -VariantChoices @{"Iron ingot"=2} | Format-Table
+
+recipe_variant output_item output_quantity input_item input_quantity
+-------------- ----------- --------------- ---------- --------------
+             1 Iron track              512 Iron ingot            384
+             1 Iron track              512 Stick                  64
+             1 Dusty coal               48 Coal                    3
+             1 Iron dust               384 Iron ore              192
+             2 Iron ingot              384 Dusty coal             48
+             2 Iron ingot              384 Iron dust             384
+             1 Stick                    64 Wood plank             32
+             1 Wood plank               32 Log                     8
+----
+
+Notice that if all variants are given, no user input is requested.
+
+== EVE Online
+
+Let's clear our database by dropping and re-creating the schema:
+
+[source,powershell]
+----
+Unregister-BomRecipeSchema
+Register-BomRecipeSchema
+----
+
+Now, add the recipes we care about:
+
+[source,powershell]
+----
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Antimatter Charge S' -OutputQuantity 100 -InputItem 'Tritanium' -InputQuantity 184
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Antimatter Charge S' -OutputQuantity 100 -InputItem 'Pyerite' -InputQuantity 16
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Antimatter Charge S' -OutputQuantity 100 -InputItem 'Nocxium' -InputQuantity 1
+----
+
+Let's do 13,500 runs:
+
+[source,powershell]
+----
+PS C:\projects\BomPs> Get-BomMaterial -RecipeVariant 1 -OutputItem 'Antimatter Charge S' -Quantity 13500 | Format-Table
+
+recipe_variant output_item         output_quantity input_item input_quantity
+-------------- -----------         --------------- ---------- --------------
+             1 Antimatter Charge S         1350000 Nocxium             13500
+             1 Antimatter Charge S         1350000 Pyerite            216000
+             1 Antimatter Charge S         1350000 Tritanium         2484000
+----
+
+Based on using the game UI, this is fairly accurate.  There is some unknown modifiers that are happening, but it isn't too far off to what is displayed in the game UI.
+
+== Other tricks
+
+You can even add timings if it takes time to craft.  Using the EVE Online example previously, let's add a number of seconds for a run:
+
+[source,powershell]
+----
+Add-BomRecipe -RecipeVariant 1 -OutputItem 'Antimatter Charge S' -OutputQuantity 100 -InputItem 'Seconds' -InputQuantity 192
+----
+
+Let's use the 13,500 figure previously:
+
+[source,powershell]
+----
+PS C:\projects\BomPs> Get-BomMaterial -RecipeVariant 1 -OutputItem 'Antimatter Charge S' -Quantity 13500 | Format-Table
+
+recipe_variant output_item         output_quantity input_item input_quantity
+-------------- -----------         --------------- ---------- --------------
+             1 Antimatter Charge S         1350000 Nocxium             13500
+             1 Antimatter Charge S         1350000 Pyerite            216000
+             1 Antimatter Charge S         1350000 Seconds           2592000
+             1 Antimatter Charge S         1350000 Tritanium         2484000
+----
+
+From the game UI, it should take 30 days.  Let's calculate it:
+
+[source,powershell]
+----
+PS C:\projects\BomPs> New-TimeSpan -Seconds 2592000
+
+Days              : 30
+Hours             : 0
+Minutes           : 0
+Seconds           : 0
+Milliseconds      : 0
+Ticks             : 25920000000000
+TotalDays         : 30
+TotalHours        : 720
+TotalMinutes      : 43200
+TotalSeconds      : 2592000
+TotalMilliseconds : 2592000000
+----
+
+Rock solid.
