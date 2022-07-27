@@ -223,7 +223,7 @@ function Get-BomMaterial {
         [parameter(Mandatory)]
         [string]$OutputItem,
         [parameter(ParameterSetName="Deep")]
-        [double]$Quantity,
+        [double]$Quantity=1,
         [parameter()]
         [HashTable]$VariantChoices,
         [parameter(ParameterSetName="Flat")]
@@ -270,7 +270,9 @@ function Get_BomMaterial {
         [parameter(Mandatory)]
         [string]$OutputItem,
         [parameter()]
-        [HashTable]$VariantChoices=@{}
+        [HashTable]$VariantChoices=@{},
+        [parameter()]
+        [double]$Quantity=1
     )
 
     if (-not $SqliteConnection) {
@@ -281,6 +283,7 @@ function Get_BomMaterial {
     $queryFooter = Get-BomQueryScript "get_bom_deep_footer.sql"
 
     $PSBoundParameters.Remove("VariantChoices") | Out-Null
+    $PSBoundParameters.Remove("Quantity") | Out-Null
 
     $possibleVariants = Get-BomRecipeVariant @PSBoundParameters
 
@@ -291,7 +294,7 @@ function Get_BomMaterial {
     $sqlParameters = @{
         "recipe_variant"=$RecipeVariant
         "output_item"=$OutputItem
-        "output_quantity"=1
+        "output_quantity"=$Quantity
     }
 
     foreach ($possibleVariant in $possibleVariants) {
