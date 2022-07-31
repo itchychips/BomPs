@@ -269,7 +269,7 @@ function Get-BomRecipeVariant {
         "output_item"=$OutputItem
     }
 
-    Invoke-SqliteQuery -SqliteConnection $SqliteConnection -Query $query -SqlParameters $sqlParameters -OutVariable results
+    Invoke-SqliteQuery -SqliteConnection $SqliteConnection -Query $query -SqlParameters $sqlParameters -OutVariable results | ConvertTo-PsPropertyStyle
 }
 
 function Get-BomMaterial {
