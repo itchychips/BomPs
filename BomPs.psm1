@@ -193,6 +193,32 @@ function Add-BomRecipe {
     Invoke-SqliteQuery -SqliteConnection $SqliteConnection -Query $query -SqlParameters $sqlParameters
 }
 
+function Remove-BomRecipe {
+    [CmdletBinding()]
+    Param(
+        [parameter(Mandatory,ValueFromPipelineByPropertyName)]
+        [int]$RecipeVariant,
+        [parameter(Mandatory,ValueFromPipelineByPropertyName)]
+        [string]$OutputItem
+    )
+
+    Begin {
+        if (-not $SqliteConnection) {
+            $SqliteConnection = Open-BomRecipeConnection
+        }
+        $query = Get-BomQueryScript "delete_recipe.sql"
+    }
+
+    Process {
+        $sqlParameters = @{
+            "recipe_variant"=$RecipeVariant
+            "output_item"=$OutputItem
+        }
+
+        Invoke-SqliteQuery -SqliteConnection $SqliteConnection -Query $query -SqlParameters $sqlParameters
+    }
+}
+
 function Get-BomRecipe {
     [CmdletBinding()]
     Param(
