@@ -275,9 +275,9 @@ function Get-BomRecipeVariant {
 function Get-BomMaterial {
     [CmdletBinding(DefaultParameterSetName="Deep")]
     Param(
-        [parameter(Mandatory)]
+        [parameter(Mandatory,ValueFromPipelineByPropertyName)]
         [int]$RecipeVariant,
-        [parameter(Mandatory)]
+        [parameter(Mandatory,ValueFromPipelineByPropertyName)]
         [string]$OutputItem,
         [parameter(ParameterSetName="Deep")]
         [double]$Quantity=1,
