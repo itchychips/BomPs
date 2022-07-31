@@ -24,6 +24,37 @@ else {
     Write-Verbose "Open connection at `$global:BomPsSqliteConnection preserved."
 }
 
+function ConvertTo-PsPropertyStyle {
+    [CmdletBinding()]
+    Param(
+        [parameter(Mandatory,ValueFromPipeline)]
+        [PSObject]$InputObject
+    )
+
+    Process {
+        $properties = Get-Member @PSBoundParameters | Where-Object { $_.MemberType -eq "NoteProperty" } | Select-Object -Expand Name
+        $outputObject = New-Object -Type PSObject
+
+        foreach ($property in $properties) {
+            $newProperty = ""
+            for ($index = 0; $index -lt $property.Length; $index++) {
+                if ($index -eq 0) {
+                    $newProperty += [char]::ToUpperInvariant($property[$index])
+                }
+                elseif ($property[$index] -eq "_") {
+                    $index += 1
+                    $newProperty += [char]::ToUpperInvariant($property[$index])
+                }
+                else {
+                    $newProperty += $property[$index]
+                }
+            }
+            $outputObject | Add-Member -Type NoteProperty -Name $newProperty -Value $InputObject.$property
+        }
+        $outputObject
+    }
+}
+
 function Open-BomRecipeConnection {
     [CmdletBinding()]
     Param(
@@ -185,7 +216,7 @@ function Get-BomRecipe {
         "input_item"=$InputName
     }
 
-    Invoke-SqliteQuery -SqliteConnection $SqliteConnection -Query $query -SqlParameters $sqlParameters -OutVariable results
+    Invoke-SqliteQuery -SqliteConnection $SqliteConnection -Query $query -SqlParameters $sqlParameters -OutVariable results | ConvertTo-PsPropertyStyle
 
     if (-not $results) {
         Write-Warning "No results found."
@@ -259,7 +290,7 @@ function Get_BomMaterialFlat {
         "output_item"=$OutputItem
     }
 
-    Invoke-SqliteQuery -SqliteConnection $SqliteConnection -Query $query -SqlParameters $sqlParameters -OutVariable results
+    Invoke-SqliteQuery -SqliteConnection $SqliteConnection -Query $query -SqlParameters $sqlParameters -OutVariable results | ConvertTo-PsPropertyStyle
 }
 
 function Get_BomMaterial {
@@ -298,8 +329,8 @@ function Get_BomMaterial {
     }
 
     foreach ($possibleVariant in $possibleVariants) {
-        if (-not $VariantChoices.ContainsKey($possibleVariant.output_item)) {
-            $choice = Read-BomUserVariant -OutputItem $possibleVariant.output_item
+        if (-not $VariantChoices.ContainsKey($possibleVariant.OutputItem)) {
+            $choice = Read-BomUserVariant -OutputItem $possibleVariant.OutputItem
             $VariantChoices[$choice.OutputItem] = $choice.RecipeVariant
             #throw "No variant defined for $($possibleVariant.output_item)."
         }
@@ -307,8 +338,8 @@ function Get_BomMaterial {
         $sqlWhereAddendum += "
                 AND (next.output_item <> @output_item_$variantCount OR (next.output_item = @output_item_$variantCount AND next.recipe_variant = @recipe_variant_$variantCount))"
 
-        $sqlParameters["output_item_$variantCount"] = $possibleVariants.output_item
-        $sqlParameters["recipe_variant_$variantCount"] = $VariantChoices[$possibleVariants.output_item]
+        $sqlParameters["output_item_$variantCount"] = $possibleVariants.OutputItem
+        $sqlParameters["recipe_variant_$variantCount"] = $VariantChoices[$possibleVariants.OutputItem]
     }
 
     $query = "$queryHeader$sqlWhereAddendum`n$queryFooter"
@@ -333,14 +364,14 @@ function Read-BomUserVariant {
         throw "No variants for recipe '$OutputItem' found."
     }
 
-    $variants = $recipes | Select-Object -Unique -Expand recipe_variant
+    $variants = $recipes | Select-Object -Unique -Expand RecipeVariant
 
-    Write-Host "Recipe for $($recipes[0].output_item) has the following possible inputs:"
+    Write-Host "Recipe for $($recipes[0].OutputItem) has the following possible inputs:"
     foreach ($variant in $variants) {
-        $variantRecipes = $recipes | Where-Object { $_.recipe_variant -eq $variant }
-        Write-Host "`t$variant (produces $($variantRecipes[0].output_quantity)):"
+        $variantRecipes = $recipes | Where-Object { $_.RecipeVariant -eq $variant }
+        Write-Host "`t$variant (produces $($variantRecipes[0].OutputQuantity)):"
         foreach ($variantRecipe in $variantRecipes) {
-            Write-Host "`t`t$($variantRecipe.input_item) x$($variantRecipe.input_quantity)"
+            Write-Host "`t`t$($variantRecipe.InputItem) x$($variantRecipe.InputQuantity)"
         }
     }
 
